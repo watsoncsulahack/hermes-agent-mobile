@@ -6,6 +6,9 @@
 __pycache__/
 .venv/
 .venv
+.venv-termux/
+.hermes-local/
+.cache/
 .vscode/
 .env
 .op.env

@@ -5,72 +5,87 @@
 
 The original Hermes Agent project is available at [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent). This fork retains the upstream MIT license and attribution.
 
-## Start the mobile web dashboard on Android
+## Recommended: run entirely inside the repository
 
-The intended upstream command is `hermes dashboard`. **You do not need to run a separate web-server script.** In this fork, the same command serves the mobile UI and automatically builds the frontend on first launch when Node.js is installed.
+If Hermes is already installed on the phone, **do not run the upstream installer again and do not create another global `hermes` command**. This fork includes an isolated launcher that keeps its Python environment, Hermes configuration, credentials, sessions, npm/pip caches, and generated files inside the cloned repository.
 
-### First-time installation from this repository
+The only shared prerequisites are normal Termux system packages such as Python, Node.js, and build tools. Installing those with `pkg` does not replace an existing Hermes installation.
 
-Run these commands inside Termux:
+### First run
 
 ```bash
-# 1. Install the Android build/runtime dependencies.
+# Install prerequisites only. This does not install Hermes globally.
 pkg update
 pkg install -y git python clang rust make pkg-config libffi openssl nodejs ripgrep ffmpeg
 
-# 2. Clone this mobile fork.
+# Clone and enter this fork.
 git clone https://github.com/watsoncsulahack/hermes-agent-mobile.git
 cd hermes-agent-mobile
 
-# 3. Create an isolated Python environment.
-python -m venv venv
-source venv/bin/activate
-export ANDROID_API_LEVEL="$(getprop ro.build.version.sdk)"
-python -m pip install --upgrade pip setuptools wheel
-
-# 4. Install this checkout in editable mode with the Termux and dashboard extras.
-python -m pip install -e '.[termux,web]' -c constraints-termux.txt
-
-# 5. Make the command available in future Termux shells.
-ln -sf "$PWD/venv/bin/hermes" "$PREFIX/bin/hermes"
-
-# 6. Configure an LLM provider/model if Hermes is not configured yet.
-hermes model
-
-# 7. Start the web dashboard. Keep this Termux session running.
-hermes dashboard --host 127.0.0.1 --port 9119 --no-open
+# Create/use the isolated environment and start the dashboard.
+./scripts/run-termux-dashboard-local.sh
 ```
 
 Then open this address in a browser on the **same Android phone**:
 
 ```text
-http://127.0.0.1:9119/chat
+http://127.0.0.1:9120/chat
 ```
 
-The first launch can take longer because Hermes installs the web workspace dependencies and builds the dashboard. When the terminal prints `HERMES_DASHBOARD_READY`, the server is ready. Stop it with **Ctrl+C**.
+Keep that Termux session running. Stop the server with **Ctrl+C**. The first run can take several minutes because Android builds several native Python dependencies. Upstream `psutil` currently rejects Android during packaging, so the launcher downloads the pinned `psutil 7.2.2` source archive, verifies its SHA-256 checksum, enables its Linux backend for Termux, and installs it only into `.venv-termux`.
+
+On the first run, the launcher creates the following ignored directories:
+
+| Path | Purpose |
+| --- | --- |
+| `.venv-termux/` | Python environment containing this checkout of Hermes |
+| `.hermes-local/` | This fork's config, credentials, sessions, skills, and state |
+| `.cache/` | Repo-local pip, uv, npm, Cargo, and other build caches |
+| `node_modules/` | Frontend dependencies installed by the dashboard build |
+| `hermes_cli/web_dist/` | Built dashboard assets |
+
+The launcher sets `HERMES_HOME` to `.hermes-local`, invokes `.venv-termux/bin/hermes` directly, and uses port `9120` to avoid the upstream dashboard's normal `9119` port. It does **not** run the upstream Hermes installer, write into an existing `~/.hermes`, modify the existing global Hermes environment, or add a symlink to `$PREFIX/bin`.
+
+Configure the model and credentials from this fork's dashboard. They are written to `.hermes-local`, not the existing Hermes installation.
 
 ### Start it again later
 
-After the first installation, the normal startup is only:
-
 ```bash
-hermes dashboard --host 127.0.0.1 --port 9119 --no-open
+cd hermes-agent-mobile
+./scripts/run-termux-dashboard-local.sh
 ```
 
-Open `http://127.0.0.1:9119/chat` in the phone browser. Because the repository was installed with `pip install -e`, the `hermes` command uses this local checkout rather than a separate PyPI copy.
+To choose another port without editing the script:
+
+```bash
+HERMES_MOBILE_PORT=9130 ./scripts/run-termux-dashboard-local.sh
+```
+
+To reset or remove this isolated copy, stop the server and delete the clone, or remove `.venv-termux`, `.hermes-local`, and `.cache`. Your separately installed Hermes remains untouched.
+
+## What actually starts the web server?
+
+The intended upstream entry point is still `hermes dashboard`; a separate Python web-server script is not required. The isolated launcher ultimately executes the equivalent of:
+
+```bash
+HERMES_HOME="$PWD/.hermes-local" \
+  "$PWD/.venv-termux/bin/hermes" dashboard \
+  --host 127.0.0.1 --port 9120 --no-open
+```
+
+`hermes dashboard` installs/builds the web workspace when needed and then serves the dashboard plus embedded xterm/TUI. The wrapper only makes that upstream workflow repo-local and conflict-free.
 
 > [!CAUTION]
-> Keep the default `127.0.0.1` bind when the dashboard is only for the phone itself. Do not expose it with `--host 0.0.0.0` unless you deliberately configure dashboard authentication and understand the network-security implications; the dashboard can access Hermes configuration and credentials.
+> Keep the `127.0.0.1` bind when the dashboard is only for the phone itself. Do not expose it with `--host 0.0.0.0` unless you deliberately configure dashboard authentication and understand the network-security implications; the dashboard can access Hermes configuration and credentials.
 
 ### Manual frontend build (normally unnecessary)
 
-`hermes dashboard` performs this automatically when needed. For frontend development or troubleshooting, the equivalent manual build is:
+The launcher performs this automatically when needed. For frontend development or troubleshooting, run from the repository root:
 
 ```bash
-# Run from the repository root.
 npm install --workspace web --include-workspace-root=false
 npm run build --workspace web
-hermes dashboard --host 127.0.0.1 --port 9119 --no-open --skip-build
+./scripts/run-termux-dashboard-local.sh --skip-build
 ```
 
 For the mobile changes and their verification history, see [`web/MOBILE_UI_ITERATIONS.md`](web/MOBILE_UI_ITERATIONS.md).
