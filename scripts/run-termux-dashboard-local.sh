@@ -7,6 +7,28 @@ LOCAL_HERMES_HOME="${HERMES_MOBILE_HOME:-$ROOT_DIR/.hermes-local}"
 CACHE_DIR="${HERMES_MOBILE_CACHE:-$ROOT_DIR/.cache}"
 PORT="${HERMES_MOBILE_PORT:-9120}"
 
+if [[ ! -x "$VENV_DIR/bin/hermes" ]]; then
+  missing=()
+  for command in python clang rustc cargo make pkg-config node npm; do
+    command -v "$command" >/dev/null 2>&1 || missing+=("$command")
+  done
+
+  if ((${#missing[@]})); then
+    echo "Missing Termux prerequisites: ${missing[*]}" >&2
+    echo "Install the first-run packages, then launch this script again:" >&2
+    echo "  pkg update" >&2
+    echo "  pkg install -y python clang rust make pkg-config libffi openssl nodejs" >&2
+    exit 1
+  fi
+
+  if ! pkg-config --exists libffi openssl; then
+    echo "Missing Termux build libraries: libffi and/or openssl" >&2
+    echo "Install them, then launch this script again:" >&2
+    echo "  pkg install -y libffi openssl pkg-config" >&2
+    exit 1
+  fi
+fi
+
 # Keep Hermes state, credentials, Python/npm caches, and generated files inside
 # this checkout. An already-installed global Hermes continues to use ~/.hermes.
 export HERMES_HOME="$LOCAL_HERMES_HOME"

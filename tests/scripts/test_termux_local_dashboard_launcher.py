@@ -56,3 +56,35 @@ def test_launcher_uses_only_repo_local_runtime_paths(tmp_path: Path) -> None:
     assert f"TMPDIR={repo / '.cache' / 'tmp'}" in values
     assert "ARGS=<dashboard><--host><127.0.0.1><--port><9120><--no-open><--skip-build>" in values
     assert "existing-global-hermes" not in values
+
+
+def test_first_run_reports_all_missing_termux_build_prerequisites(tmp_path: Path) -> None:
+    repo = tmp_path / "checkout"
+    scripts = repo / "scripts"
+    fake_path = tmp_path / "bin"
+    scripts.mkdir(parents=True)
+    fake_path.mkdir()
+    shutil.copy2(LAUNCHER, scripts / LAUNCHER.name)
+
+    dirname = shutil.which("dirname")
+    bash = shutil.which("bash")
+    assert dirname is not None and bash is not None
+    (fake_path / "dirname").symlink_to(dirname)
+    for command in ("python", "node", "npm", "clang", "make", "pkg-config"):
+        executable = fake_path / command
+        executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        executable.chmod(0o755)
+
+    env = os.environ.copy()
+    env["PATH"] = str(fake_path)
+    result = subprocess.run(
+        [bash, str(scripts / LAUNCHER.name)],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1
+    assert "Missing Termux prerequisites: rustc cargo" in result.stderr
+    assert "pkg install -y python clang rust make pkg-config libffi openssl nodejs" in result.stderr

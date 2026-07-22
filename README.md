@@ -9,15 +9,37 @@ The original Hermes Agent project is available at [NousResearch/hermes-agent](ht
 
 If Hermes is already installed on the phone, **do not run the upstream installer again and do not create another global `hermes` command**. This fork includes an isolated launcher that keeps its Python environment, Hermes configuration, credentials, sessions, npm/pip caches, and generated files inside the cloned repository.
 
-The only shared prerequisites are normal Termux system packages such as Python, Node.js, and build tools. Installing those with `pkg` does not replace an existing Hermes installation.
+### Prerequisites — install these before the first launch
+
+Before cloning or running the isolated launcher, make sure the phone has:
+
+- a current release of **Termux from [F-Droid](https://f-droid.org/packages/com.termux/) or the [official Termux GitHub releases](https://github.com/termux/termux-app/releases)**; do not use the obsolete Google Play build;
+- a stable internet connection for the first dependency download and frontend build;
+- at least **2 GB of free storage** available to Termux for the repository, private environment, native builds, and caches;
+- enough time and battery for the first native build—keeping the phone awake and connected to power is recommended.
+
+Install the required runtime and build packages once:
+
+```bash
+pkg update
+pkg install -y git python clang rust make pkg-config libffi openssl nodejs
+```
+
+These packages provide Git, Python and virtual environments, Node.js/npm, the C and Rust compilers, and the native libraries needed to build Android Python dependencies. They are shared Termux system tools; this command does **not** install Hermes or modify an existing Hermes configuration.
+
+Optional but recommended for the broader Hermes toolset:
+
+```bash
+pkg install -y ripgrep ffmpeg
+```
+
+The launcher also performs a first-run preflight. If Python, Node/npm, the compilers, or the native build libraries are missing, it stops immediately and prints the exact `pkg install` command instead of failing halfway through setup.
 
 ### First run
 
-```bash
-# Install prerequisites only. This does not install Hermes globally.
-pkg update
-pkg install -y git python clang rust make pkg-config libffi openssl nodejs ripgrep ffmpeg
+After the prerequisites above are installed:
 
+```bash
 # Clone and enter this fork.
 git clone https://github.com/watsoncsulahack/hermes-agent-mobile.git
 cd hermes-agent-mobile
