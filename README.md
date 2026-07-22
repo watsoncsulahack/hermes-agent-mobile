@@ -1,3 +1,84 @@
+# Hermes Agent Mobile — Android / Termux Fork
+
+> [!IMPORTANT]
+> **Independent fork — no affiliation with Nous Research.** This repository is maintained independently by `watsoncsulahack`. The maintainer is not affiliated with, employed by, sponsored by, endorsed by, or acting on behalf of [Nous Research](https://nousresearch.com). References to Hermes Agent and Nous Research identify the upstream open-source project and its original authors only. This fork exists specifically to make the Hermes Agent web dashboard and embedded terminal practical to run and use on an Android phone through [Termux](https://termux.dev/).
+
+The original Hermes Agent project is available at [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent). This fork retains the upstream MIT license and attribution.
+
+## Start the mobile web dashboard on Android
+
+The intended upstream command is `hermes dashboard`. **You do not need to run a separate web-server script.** In this fork, the same command serves the mobile UI and automatically builds the frontend on first launch when Node.js is installed.
+
+### First-time installation from this repository
+
+Run these commands inside Termux:
+
+```bash
+# 1. Install the Android build/runtime dependencies.
+pkg update
+pkg install -y git python clang rust make pkg-config libffi openssl nodejs ripgrep ffmpeg
+
+# 2. Clone this mobile fork.
+git clone https://github.com/watsoncsulahack/hermes-agent-mobile.git
+cd hermes-agent-mobile
+
+# 3. Create an isolated Python environment.
+python -m venv venv
+source venv/bin/activate
+export ANDROID_API_LEVEL="$(getprop ro.build.version.sdk)"
+python -m pip install --upgrade pip setuptools wheel
+
+# 4. Install this checkout in editable mode with the Termux and dashboard extras.
+python -m pip install -e '.[termux,web]' -c constraints-termux.txt
+
+# 5. Make the command available in future Termux shells.
+ln -sf "$PWD/venv/bin/hermes" "$PREFIX/bin/hermes"
+
+# 6. Configure an LLM provider/model if Hermes is not configured yet.
+hermes model
+
+# 7. Start the web dashboard. Keep this Termux session running.
+hermes dashboard --host 127.0.0.1 --port 9119 --no-open
+```
+
+Then open this address in a browser on the **same Android phone**:
+
+```text
+http://127.0.0.1:9119/chat
+```
+
+The first launch can take longer because Hermes installs the web workspace dependencies and builds the dashboard. When the terminal prints `HERMES_DASHBOARD_READY`, the server is ready. Stop it with **Ctrl+C**.
+
+### Start it again later
+
+After the first installation, the normal startup is only:
+
+```bash
+hermes dashboard --host 127.0.0.1 --port 9119 --no-open
+```
+
+Open `http://127.0.0.1:9119/chat` in the phone browser. Because the repository was installed with `pip install -e`, the `hermes` command uses this local checkout rather than a separate PyPI copy.
+
+> [!CAUTION]
+> Keep the default `127.0.0.1` bind when the dashboard is only for the phone itself. Do not expose it with `--host 0.0.0.0` unless you deliberately configure dashboard authentication and understand the network-security implications; the dashboard can access Hermes configuration and credentials.
+
+### Manual frontend build (normally unnecessary)
+
+`hermes dashboard` performs this automatically when needed. For frontend development or troubleshooting, the equivalent manual build is:
+
+```bash
+# Run from the repository root.
+npm install --workspace web --include-workspace-root=false
+npm run build --workspace web
+hermes dashboard --host 127.0.0.1 --port 9119 --no-open --skip-build
+```
+
+For the mobile changes and their verification history, see [`web/MOBILE_UI_ITERATIONS.md`](web/MOBILE_UI_ITERATIONS.md).
+
+---
+
+## Upstream Hermes Agent README
+
 <p align="center">
   <img src="assets/banner.png" alt="Hermes Agent" width="100%">
 </p>
