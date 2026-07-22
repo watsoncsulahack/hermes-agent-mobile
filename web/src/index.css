@@ -129,15 +129,34 @@ code, kbd, pre, samp, .font-mono, .font-mono-ui {
   overflow: hidden;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1023px) {
   html,
   body,
   #root {
-    min-height: 100dvh;
-    height: auto;
-    max-height: none;
-    overflow-x: hidden;
-    overflow-y: auto;
+    min-height: 0;
+    height: var(--hermes-visual-viewport-height, 100dvh);
+    max-height: var(--hermes-visual-viewport-height, 100dvh);
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  /* xterm owns the chat transcript's one and only scroll surface. Its v6
+     viewport uses a custom VS Code-style scrollbar rather than the old
+     .xterm-viewport native scrollbar. */
+  .hermes-chat-xterm-host,
+  .hermes-chat-xterm-host .xterm {
+    overscroll-behavior: contain;
+    touch-action: none;
+  }
+  .hermes-chat-xterm-host .xterm-scrollable-element > .scrollbar {
+    display: none !important;
+  }
+
+  /* Mobile browsers inspect the focused input's font size even though
+     xterm keeps this textarea visually hidden. A 16px floor prevents the
+     browser from zooming the page when the software keyboard opens. */
+  .hermes-chat-xterm-host .xterm-helper-textarea {
+    font-size: 16px !important;
   }
 }
 

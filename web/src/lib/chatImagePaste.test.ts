@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   firstImageFromClipboard,
+  imageFileLooksSupported,
   imageFilesFromTransfer,
+  normalizeImageFile,
   transferMayContainImage,
 } from "./chatImagePaste";
 
@@ -79,6 +81,33 @@ describe("imageFilesFromTransfer", () => {
       files: [png, gif],
     });
     expect(imageFilesFromTransfer(data)).toEqual([png, gif]);
+  });
+
+  it("accepts Android screenshots whose provider omits the MIME type", () => {
+    const screenshot = new File([new Uint8Array([1])], "Screenshot.png");
+    const data = makeData({ items: [makeItem("file", "", screenshot)] });
+    expect(imageFilesFromTransfer(data)).toEqual([screenshot]);
+  });
+});
+
+describe("Android file-provider image normalization", () => {
+  it("recognizes supported filenames with empty or generic MIME types", () => {
+    expect(imageFileLooksSupported(new File([], "shot.PNG"))).toBe(true);
+    expect(
+      imageFileLooksSupported(
+        new File([], "shot.jpg", { type: "application/octet-stream" }),
+      ),
+    ).toBe(true);
+    expect(imageFileLooksSupported(new File([], "notes.txt"))).toBe(false);
+  });
+
+  it("normalizes a screenshot to the canonical image MIME type", () => {
+    const screenshot = new File([], "shot.PNG", {
+      type: "application/octet-stream",
+    });
+    const normalized = normalizeImageFile(screenshot);
+    expect(normalized.type).toBe("image/png");
+    expect(normalized.name).toBe("shot.PNG");
   });
 });
 

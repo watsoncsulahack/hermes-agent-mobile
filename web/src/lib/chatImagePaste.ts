@@ -9,6 +9,9 @@ const IMAGE_MIME_EXT: Record<string, string> = {
   "image/webp": "webp",
   "image/bmp": "bmp",
 };
+const IMAGE_EXT_MIME: Record<string, string> = Object.fromEntries(
+  Object.entries(IMAGE_MIME_EXT).map(([mime, ext]) => [ext, mime]),
+);
 
 // Anthropic caps a single vision image at ~25 MB; reject earlier client-side
 // with a clear message rather than round-tripping a doomed upload.
@@ -28,8 +31,30 @@ function imageFileKey(file: File): string {
   return `${file.name}\0${file.type}\0${file.size}\0${file.lastModified}`;
 }
 
+function canonicalImageMime(file: File): string | null {
+  if (IMAGE_MIME_EXT[file.type.toLowerCase()]) return file.type.toLowerCase();
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+  return IMAGE_EXT_MIME[ext] ?? null;
+}
+
+export function imageFileLooksSupported(file: File): boolean {
+  return canonicalImageMime(file) !== null;
+}
+
+export function normalizeImageFile(file: File): File {
+  const mime = canonicalImageMime(file);
+  if (!mime) {
+    throw new Error(`unsupported image type: ${file.name || "unnamed file"}`);
+  }
+  if (file.type.toLowerCase() === mime) return file;
+  return new File([file], file.name || `image.${IMAGE_MIME_EXT[mime]}`, {
+    type: mime,
+    lastModified: file.lastModified,
+  });
+}
+
 function addImageFile(files: File[], seen: Set<string>, file: File | null) {
-  if (!file || !file.type.startsWith("image/")) return;
+  if (!file || !imageFileLooksSupported(file)) return;
   const key = imageFileKey(file);
   if (seen.has(key)) return;
   seen.add(key);
@@ -47,7 +72,7 @@ export function imageFilesFromTransfer(
   if (data.items?.length) {
     for (let i = 0; i < data.items.length; i++) {
       const item = data.items[i];
-      if (item.kind === "file" && item.type.startsWith("image/")) {
+      if (item.kind === "file") {
         addImageFile(files, seen, item.getAsFile());
       }
     }
@@ -86,7 +111,7 @@ export function transferMayContainImage(data: DataTransfer | null): boolean {
   }
   if (data.files?.length) {
     for (let i = 0; i < data.files.length; i++) {
-      if (data.files[i].type.startsWith("image/")) return true;
+      if (imageFileLooksSupported(data.files[i])) return true;
     }
   }
   return false;
@@ -129,16 +154,17 @@ export async function uploadChatImage(
     throw new Error(`image too large (max ${mb} MB)`);
   }
 
-  const mime = blob.type || "image/png";
+  const normalized = blob instanceof File ? normalizeImageFile(blob) : blob;
+  const mime = normalized.type || "image/png";
   const ext = IMAGE_MIME_EXT[mime] || "png";
   const filename =
-    blob instanceof File && blob.name
-      ? blob.name
+    normalized instanceof File && normalized.name
+      ? normalized.name
       : `clipboard.${ext}`;
   const file =
-    blob instanceof File
-      ? blob
-      : new File([blob], filename, { type: mime });
+    normalized instanceof File
+      ? normalized
+      : new File([normalized], filename, { type: mime });
 
   const dataUrl = await fileToDataUrl(file);
   const qs = profile ? `?profile=${encodeURIComponent(profile)}` : "";
@@ -153,7 +179,13 @@ export async function uploadChatImage(
 
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
-    throw new Error(text || `HTTP ${res.status}`);
+    let detail = text;
+    try {
+      detail = (JSON.parse(text) as { detail?: string }).detail ?? text;
+    } catch {
+      /* plain-text response */
+    }
+    throw new Error(detail || `HTTP ${res.status}`);
   }
 
   const uploaded = (await res.json()) as ChatImageUploadResult;
