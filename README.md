@@ -85,53 +85,6 @@ HERMES_MOBILE_PORT=9130 ./scripts/run-termux-dashboard-local.sh
 
 To reset or remove this isolated copy, stop the server and delete the clone, or remove `.venv-termux`, `.hermes-local`, and `.cache`. Your separately installed Hermes remains untouched.
 
-## Phone not powerful enough? Offload it to GitHub
-
-A normal GitHub Actions runner cannot produce a drop-in Termux environment: its native Python wheels target desktop Linux (`glibc`), while Android/Termux uses Android's `bionic` C library. Installing those desktop wheels on the phone would be unreliable. This repository therefore provides two safe GitHub-backed options.
-
-### Option A — run all of Hermes in GitHub Codespaces
-
-This is the full offload path. GitHub builds and runs Hermes in a cloud development container; the phone only displays the mobile dashboard in its browser.
-
-[**Open this repository in GitHub Codespaces**](https://codespaces.new/watsoncsulahack/hermes-agent-mobile?quickstart=1)
-
-1. Sign in to GitHub, open the link, and select **Create codespace**.
-2. Wait for the initial `postCreateCommand` to finish. It creates `.venv-codespaces`, installs Hermes, and builds the dashboard on the cloud machine.
-3. The dashboard starts automatically on forwarded port `9119`.
-4. Open the Codespaces **Ports** panel, find **Hermes mobile dashboard**, and select **Open in Browser**.
-5. Configure the model and credentials in that dashboard. Codespaces state is separate from the phone's local Hermes installation.
-
-> [!WARNING]
-> Keep forwarded port `9119` set to **Private**. GitHub's private Codespaces proxy supplies the access control for this loopback-bound dashboard. Do not change the port to Public; a public forwarded dashboard could expose Hermes sessions, tools, and credentials. Codespaces availability, quotas, and billing depend on the user's GitHub plan, and deleting the codespace deletes its unexported local state.
-
-The cloud setup is defined in [`.devcontainer/devcontainer.json`](.devcontainer/devcontainer.json). It can also be started manually inside the codespace:
-
-```bash
-bash .devcontainer/setup.sh
-bash .devcontainer/start-dashboard.sh
-```
-
-### Option B — let GitHub Actions build only the web interface
-
-If the phone can install the Python environment but struggles with Node/Vite, use the **Build mobile web artifact** workflow:
-
-1. Open the repository's **Actions** tab.
-2. Select **Build mobile web artifact** and choose **Run workflow**.
-3. When it succeeds, download the `hermes-mobile-web-<commit>` artifact from the run summary. Artifacts are retained for 14 days.
-4. Move the downloaded ZIP into the repository and run:
-
-```bash
-mkdir -p .github-build
-unzip hermes-mobile-web-*.zip -d .github-build
-cd .github-build
-sha256sum -c hermes-mobile-web-*.tar.gz.sha256
-cd ..
-tar -xzf .github-build/hermes-mobile-web-*.tar.gz -C hermes_cli
-./scripts/run-termux-dashboard-local.sh --skip-build
-```
-
-The workflow typechecks and tests the frontend before packaging `hermes_cli/web_dist`. This avoids building React on the phone, but it does **not** avoid Android's native Python compilation. If native Python builds are the problem, use Codespaces instead.
-
 ## What actually starts the web server?
 
 The intended upstream entry point is still `hermes dashboard`; a separate Python web-server script is not required. The isolated launcher ultimately executes the equivalent of:
