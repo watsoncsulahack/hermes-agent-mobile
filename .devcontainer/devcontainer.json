@@ -1,0 +1,21 @@
+{
+  "name": "Hermes Agent Mobile (cloud build)",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    }
+  },
+  "forwardPorts": [9119],
+  "portsAttributes": {
+    "9119": {
+      "label": "Hermes mobile dashboard",
+      "onAutoForward": "notify"
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "postStartCommand": "bash .devcontainer/start-dashboard.sh",
+  "remoteUser": "vscode"
+}

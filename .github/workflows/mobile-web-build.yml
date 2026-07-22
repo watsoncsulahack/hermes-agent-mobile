@@ -1,0 +1,57 @@
+name: Build mobile web artifact
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/mobile-web-build.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-web:
+    name: Build dashboard in GitHub
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Typecheck and test
+        run: npm run check --workspace web
+
+      - name: Build dashboard
+        run: npm run build --workspace web
+
+      - name: Package dashboard
+        shell: bash
+        run: |
+          mkdir -p build
+          archive="build/hermes-mobile-web-${GITHUB_SHA::12}.tar.gz"
+          tar -czf "$archive" -C hermes_cli web_dist
+          (
+            cd build
+            sha256sum "$(basename "$archive")" > "$(basename "$archive").sha256"
+          )
+          printf 'commit=%s\ncreated_utc=%s\n' \
+            "$GITHUB_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            > build/manifest.txt
+
+      - name: Upload downloadable build
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: hermes-mobile-web-${{ github.sha }}
+          path: build/
+          if-no-files-found: error
+          retention-days: 14
